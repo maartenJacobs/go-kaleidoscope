@@ -23,8 +23,9 @@ const (
 
 type Lexer struct {
 	scanner   scanner.Scanner
-	LastFloat float64
-	LastIdent string
+	LastFloat float64 // Filled in if TOKEN_NUMBER is returned
+	LastIdent string  // Filled in if TOKEN_IDENTIFIER is returned
+	LastChar  rune    // Filled in if TOKEN_UNKNOWN is returned
 }
 
 func (lex *Lexer) Init(src io.Reader) {
@@ -36,7 +37,8 @@ func (lex *Lexer) Init(src io.Reader) {
 }
 
 func (lex *Lexer) Token() token {
-	switch lex.scanner.Scan() {
+	lastChar := lex.scanner.Scan()
+	switch lastChar {
 	case scanner.Float:
 		if parsedFloat, parseErr := strconv.ParseFloat(lex.scanner.TokenText(), 64); parseErr != nil {
 			// TODO: can scanner scan a float that cannot be parsed by strconv?
@@ -58,6 +60,7 @@ func (lex *Lexer) Token() token {
 	case scanner.EOF:
 		return TOKEN_EOF
 	default:
+		lex.LastChar = lastChar
 		return TOKEN_UNKNOWN
 	}
 }

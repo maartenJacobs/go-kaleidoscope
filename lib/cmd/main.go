@@ -20,6 +20,14 @@ func main() {
 			fmt.Print("Identifier: ")
 			fmt.Print(lex.LastIdent)
 			fmt.Println()
+		case gokaleidoscope.TOKEN_NUMBER:
+			fmt.Print("Float: ")
+			fmt.Print(lex.LastFloat)
+			fmt.Println()
+		case gokaleidoscope.TOKEN_UNKNOWN:
+			fmt.Print("Unknown: ")
+			fmt.Print(lex.LastChar)
+			fmt.Println()
 		}
 	}
 
