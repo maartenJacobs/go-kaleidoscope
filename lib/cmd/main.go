@@ -1,9 +1,5 @@
 package main
 
-/*
-#include "llvm-c/Core.h"
-*/
-import "C"
 import (
 	"fmt"
 	"os"
@@ -11,31 +7,75 @@ import (
 	gokaleidoscope "github.com/maartenjacobs/go-kaleidoscope/lib"
 )
 
-func main() {
-	var lex gokaleidoscope.Lexer
-	lex.Init(os.Stdin)
-	for token := lex.Token(); token != gokaleidoscope.TOKEN_EOF; token = lex.Token() {
-		switch token {
-		case gokaleidoscope.TOKEN_IDENTIFIER:
-			fmt.Print("Identifier: ")
-			fmt.Print(lex.LastIdent)
-			fmt.Println()
-		case gokaleidoscope.TOKEN_NUMBER:
-			fmt.Print("Float: ")
-			fmt.Print(lex.LastFloat)
-			fmt.Println()
-		case gokaleidoscope.TOKEN_UNKNOWN:
-			fmt.Print("Unknown: ")
-			fmt.Print(lex.LastChar)
-			fmt.Println()
-		}
+func handleDefinition(parser *gokaleidoscope.Parser) {
+	_, err := parser.ParseDefinition()
+	if err != nil {
+		// Skip token for error recovery.
+		parser.Next()
+		fmt.Println(err)
+		fmt.Println("Unable to parse definition")
+	} else {
+		fmt.Println("Parsed definition")
 	}
+}
 
-	// Create the execution context.
-	var context C.LLVMContextRef = C.LLVMContextCreate()
-	defer C.LLVMContextDispose(context)
+func handleExtern(parser *gokaleidoscope.Parser) {
+	_, err := parser.ParseExtern()
+	if err != nil {
+		// Skip token for error recovery.
+		parser.Next()
+		fmt.Println(err)
+		fmt.Println("Unable to parse external")
+	} else {
+		fmt.Println("Parsed external")
+	}
+}
 
-	// Create a module to hold the IR code.
-	var mod C.LLVMModuleRef = C.LLVMModuleCreateWithNameInContext(C.CString("my module"), context)
-	defer C.LLVMDisposeModule(mod)
+func handleTopLevelExpr(parser *gokaleidoscope.Parser) {
+	_, err := parser.ParseTopLevelExpr()
+	if err != nil {
+		// Skip token for error recovery.
+		parser.Next()
+		fmt.Println(err)
+		fmt.Println("Unable to parse top-level expression")
+	} else {
+		fmt.Println("Parsed top-level expression")
+	}
+}
+
+/// top ::= definition | external | expression | ';'
+func mainLoop(parser *gokaleidoscope.Parser) {
+	for {
+		switch parser.Current {
+		case gokaleidoscope.TOKEN_EOF:
+			return
+		case gokaleidoscope.TOKEN_DEF:
+			handleDefinition(parser)
+		case gokaleidoscope.TOKEN_EXTERN:
+			handleExtern(parser)
+		case gokaleidoscope.TOKEN_UNKNOWN:
+			if parser.LastChar() == ';' {
+				parser.Next() // ignore top-level semicolons.
+			} else {
+				handleTopLevelExpr(parser)
+			}
+		default:
+			handleTopLevelExpr(parser)
+		}
+		fmt.Print("ready> ")
+	}
+}
+
+func main() {
+	var parser gokaleidoscope.Parser
+	parser.Init(os.Stdin)
+	parser.BinOpPrecedence['<'] = 10
+	parser.BinOpPrecedence['+'] = 20
+	parser.BinOpPrecedence['-'] = 20
+	parser.BinOpPrecedence['*'] = 40
+
+	fmt.Print("ready> ")
+	parser.Next() // Prime the first token.
+
+	mainLoop(&parser)
 }
