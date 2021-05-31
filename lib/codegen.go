@@ -101,16 +101,26 @@ func (visitor *astCodegenVisitor) VisitCallExprAST(node *CallExprAST) error {
 	// Create a C array from the arguments.
 	valueSize := C.uint(C.sizeof_LLVMValueRef)
 	args := C.malloc(C.ulong(valueSize * argCount))
+	// TODO: unclear whether args needs freeing at the end of this scope.
+	// It's used to build a call value down below so maybe the context will clear it?
 	defer C.free(unsafe.Pointer(args))
 	argNumber := 0
-	for arg := range node.Args {
-		// Setting the arguments is pretty painful. `unsafe` allows iteration but not setting values?
-		C.set_arg_in(&args[0], C.int(argNumber), arg)
+	for _, arg := range node.Args {
+		argError := arg.Accept(visitor)
+		if argError != nil {
+			return argError
+		}
+		argValue := visitor.LastValue
+
+		// Setting values in a C array is difficult with Go. Here we use a helper function
+		// defined in the preamble comment of this file.
+		C.set_arg_in((*C.LLVMValueRef)(args), C.int(argNumber), argValue)
 		argNumber = argNumber + 1
 	}
 
 	opName := C.CString("calltmp")
 	defer C.free(unsafe.Pointer(opName))
+	visitor.LastValue = C.LLVMBuildCall(visitor.builder, callee, (*C.LLVMValueRef)(args), C.uint(argCount), opName)
 
 	return nil
 }
